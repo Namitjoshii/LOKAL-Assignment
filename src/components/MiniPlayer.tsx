@@ -8,21 +8,31 @@ import {
 } from 'react-native';
 import { decodeHtml } from '../utils/decodeHtml';
 import Ionicons from '@expo/vector-icons/Ionicons';
-
+import { useNavigation } from '@react-navigation/native';
 import { usePlayerStore } from '../store/playerStore';
 
 
 const MiniPlayer = () => {
+    const navigation = useNavigation<any>();
     const{ currentSong,isPlaying,sound,setIsPlaying} = usePlayerStore();
 
     if(!currentSong){
         return null;
     }
+    
 
     
 
     return (
-        <View style={styles.container}>
+        <TouchableOpacity
+        style ={styles.container}
+        activeOpacity={0.9}
+        onPress={()=>
+            navigation.navigate('Player',{
+                song:currentSong,
+            })
+        }
+        >
             <Image source={{
                 uri: currentSong.image?.[2]?.url,
             }}
@@ -60,7 +70,8 @@ const MiniPlayer = () => {
                 color="black"
                 />
             </TouchableOpacity>
-        </View>
+       
+        </TouchableOpacity>
     )
 }
 

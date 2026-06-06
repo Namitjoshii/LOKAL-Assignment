@@ -21,9 +21,9 @@ import { usePlayerStore } from '../store/playerStore';
 const PlayerScreen = () => {
   const route = useRoute<any>();
  const navigation = useNavigation<any>();
-const{currentSong,setCurrentSong,isPlaying,setIsPlaying,sound,setSound,} = usePlayerStore();
+const{currentSong,setCurrentSong,isPlaying,setIsPlaying,sound,setSound,recentlyPlayed} = usePlayerStore();
  
-
+const{addRecentlyPlayed,} = usePlayerStore();
  /*useEffect(() => {
   return sound?() =>{
     sound.unloadAsync();
@@ -35,6 +35,14 @@ const{currentSong,setCurrentSong,isPlaying,setIsPlaying,sound,setSound,} = usePl
  */
 
 const { song } = route.params;
+console.log(
+  "ARTISTS:",
+  JSON.stringify(
+    song.artists?.primary,
+    null,
+    2
+  )
+);
 
 console.log("CLICKED SONG:", song.name);
 console.log("STORE SONG:", currentSong?.name);
@@ -77,7 +85,9 @@ console.log("PLAYING URL:", audioUrl);
 
     setSound(newSound);
     setCurrentSong(song);
+    addRecentlyPlayed(song);
     setIsPlaying(true);
+    console.log("recently played",recentlyPlayed);
 
   } catch (error) {
     console.log('PLAY ERROR:', error);
