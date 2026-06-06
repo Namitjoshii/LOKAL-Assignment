@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { decodeHtml } from '../utils/decodeHtml';
-
 import SongCard from '../components/SongCard';
 import { searchSongs } from '../services/songService';
+import { usePlayerStore } from '../store/playerStore';
 
 const HomeScreen = () => {
   const navigation = useNavigation<any>();
+
+  const{setCurrentSong} = usePlayerStore();
 
   const [songs, setSongs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
