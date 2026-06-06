@@ -7,3 +7,13 @@ export const getArtistSongs = async(artistId: string) => {
     return response.data;
     
 };
+
+export const searchArtists = async (
+  query: string
+) => {
+  const response = await api.get(
+    `/search/artists?query=${query}`
+  );
+
+  return response.data;
+};
