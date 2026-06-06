@@ -5,72 +5,139 @@ import React, {
 
 import {
   View,
-  FlatList,
   Text,
+  Image,
+  FlatList,
   StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  useRoute,
+  useNavigation,
+} from '@react-navigation/native';
 
-import { useRoute } from '@react-navigation/native';
-import { useNavigation } from '@react-navigation/native';
+import {
+  SafeAreaView,
+} from 'react-native-safe-area-context';
 
 import SongCard from '../components/SongCard';
 
-import { getArtistSongs }
-from '../services/artistService';
+import {
+  getArtistSongs,
+} from '../services/artistService';
 
-const ArtistScreen = () => {
+const ArtistDetailScreen = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-    
+
   const {
     artistId,
     artistName,
+    artistImage,
   } = route.params;
+
 
   const [songs, setSongs] =
     useState<any[]>([]);
 
-  const loadArtistSongs =
-    async () => {
-      try {
-        const data =
-          await getArtistSongs(
-            artistId
-          );
+  const [loading, setLoading] =
+    useState(true);
 
-        console.log(
-          'ARTIST DATA:',
-          data
+        useEffect(() => {
+  const load = async () => {
+    try {
+      const songsRes =
+        await getArtistSongs(
+          artistId
         );
 
-        setSongs(
-          data.data.songs || []
-        );
-      } catch (error) {
-        console.log(error);
-      }
-    };
+      console.log(
+        'SONGS RES:',
+        JSON.stringify(
+          songsRes,
+          null,
+          2
+        )
+      );
 
-  useEffect(() => {
-    loadArtistSongs();
-  }, []);
+      setSongs(
+        songsRes.data?.songs ||
+        songsRes.data?.topSongs ||
+        songsRes.songs ||
+        songsRes.topSongs ||
+        []
+      );
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  load();
+}, [artistId]);
+
+        
+
+  if (loading) {
+    return (
+      <View
+        style={
+          styles.loadingCenter
+        }
+      >
+        <ActivityIndicator
+          size="large"
+          color="#ff8c1a"
+        />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView
       style={styles.container}
     >
-      <Text style={styles.title}>
-        {artistName}
-      </Text>
-
       <FlatList
-        data={songs}
-        keyExtractor={(item) =>
-          item.id
+        ListHeaderComponent={
+          <>
+            <Image
+              source={{
+                uri:
+                  artistImage,
+              }}
+              style={
+                styles.artistImage
+              }
+            />
+
+            <Text
+              style={
+                styles.artistName
+              }
+            >
+              {artistName}
+            </Text>
+
+            <Text
+              style={
+                styles.songCount
+              }
+            >
+              {songs.length}{' '}
+              Songs
+            </Text>
+          </>
         }
-        renderItem={({ item }) => (
+        data={songs}
+        keyExtractor={(
+          item
+        ) => item.id}
+        renderItem={({
+          item,
+        }) => (
           <SongCard
             song={item}
             onPress={() =>
@@ -82,6 +149,14 @@ const ArtistScreen = () => {
               )
             }
             onMenuPress={() => {}}
+            onPlayPress={() =>
+              navigation.navigate(
+                'Player',
+                {
+                  song: item,
+                }
+              )
+            }
           />
         )}
       />
@@ -89,18 +164,44 @@ const ArtistScreen = () => {
   );
 };
 
-export default ArtistScreen;
+export default ArtistDetailScreen;
 
 const styles =
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#fff',
+      backgroundColor:
+        '#fff',
     },
 
-    title: {
-      fontSize: 24,
+    loadingCenter: {
+      flex: 1,
+      justifyContent:
+        'center',
+      alignItems:
+        'center',
+    },
+
+    artistImage: {
+      width: 180,
+      height: 180,
+      borderRadius: 90,
+      alignSelf:
+        'center',
+      marginTop: 20,
+    },
+
+    artistName: {
+      fontSize: 28,
       fontWeight: '700',
-      padding: 20,
+      textAlign: 'center',
+      marginTop: 15,
+    },
+
+    songCount: {
+      textAlign: 'center',
+      color: 'gray',
+      marginBottom: 20,
+      marginTop: 5,
     },
   });

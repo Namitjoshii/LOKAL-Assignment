@@ -106,8 +106,14 @@ const artists = recentlyPlayed
     showsHorizontalScrollIndicator={false}
     renderItem={({ item }) => (
       <TouchableOpacity
-        style={styles.artistCard}
-      >
+  style={styles.artistCard}
+  onPress={() =>
+    navigation.navigate('Artist', {
+      artistId: item.id,
+      artistName: item.name,
+    })
+  }
+>
         <Image
           source={{
             uri:
@@ -127,8 +133,56 @@ const artists = recentlyPlayed
   />
 </View>
   
+<View style={styles.artistSection}>
+  <View style={styles.sectionHeader}>
+    <Text style={styles.heading}>
+      Most Played
+    </Text>
+
+    <TouchableOpacity>
+      <Text style={styles.seeAll}>
+        See All
+      </Text>
+    </TouchableOpacity>
+  </View>
+
+  <FlatList
+    horizontal
+    data={recentlyPlayed.slice(0, 10)}
+    keyExtractor={(item) => item.id}
+    showsHorizontalScrollIndicator={false}
+    renderItem={({ item }) => (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() =>
+          navigation.navigate('Player', {
+            song: item,
+          })
+        }
+      >
+        <Image
+          source={{
+            uri:
+              item.image?.[2]?.url ||
+              item.image?.[2]?.link,
+          }}
+          style={styles.image}
+        />
+
+        <Text
+          numberOfLines={1}
+          style={styles.title}
+        >
+          {decodeHtml(item.name)}
+        </Text>
+      </TouchableOpacity>
+    )}
+  />
+</View>
 
     </View>
+
+    
   );
 };
 

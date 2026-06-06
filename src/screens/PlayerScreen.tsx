@@ -1,226 +1,219 @@
 import React, { useEffect } from 'react';
 import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
+  View, Text, Image, StyleSheet,
+  TouchableOpacity, Pressable,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
-import { decodeHtml } from '../utils/decodeHtml';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Audio } from 'expo-av';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Pressable } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import {Audio} from 'expo-av';
-import { useState } from 'react';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+import { decodeHtml } from '../utils/decodeHtml';
 import { usePlayerStore } from '../store/playerStore';
 
 const PlayerScreen = () => {
   const route = useRoute<any>();
- const navigation = useNavigation<any>();
-const{currentSong,setCurrentSong,isPlaying,setIsPlaying,sound,setSound,recentlyPlayed} = usePlayerStore();
- 
-const{addRecentlyPlayed,} = usePlayerStore();
- /*useEffect(() => {
-  return sound?() =>{
-    sound.unloadAsync();
-  }
-  :undefined;
- },[sound]); //yeh apan ne memory release krne ke liye use kiya hai
- //jaise agar tu ek baar song 1 krega back krke 2 chalayega toh song 1 wahi rahega 
- //toh isse nahi rahegaa
- */
+  const navigation = useNavigation<any>();
 
-const { song } = route.params;
-console.log(
-  "ARTISTS:",
-  JSON.stringify(
-    song.artists?.primary,
-    null,
-    2
-  )
-);
+  const {
+    currentSong, setCurrentSong,
+    isPlaying, setIsPlaying,
+    sound, setSound,
+    shuffle, repeat, setShuffle, setRepeat,
+    addRecentlyPlayed,
+    queue,  // 👈 store se queue
+  } = usePlayerStore();
 
-console.log("CLICKED SONG:", song.name);
-console.log("STORE SONG:", currentSong?.name);
-console.log("SOUND EXISTS:", !!sound);
+  const { song } = route.params;
 
-const playSong = async () => {
-  try {
-    // Same song hai -> Pause / Resume
-    if (
-      sound &&
-      currentSong?.id === song.id
-    ) {
-      if (isPlaying) {
-        await sound.pauseAsync();
-        setIsPlaying(false);
-      } else {
-        await sound.playAsync();
-        setIsPlaying(true);
+  // 👇 FIX: displaySong — agar currentSong hai toh woh, warna route ka song
+  const displaySong = currentSong ?? song;
+
+  const playSong = async (songToPlay: any) => {
+    try {
+      // Same song — toggle play/pause
+      if (sound && currentSong?.id === songToPlay.id) {
+        if (isPlaying) {
+          await sound.pauseAsync();
+          setIsPlaying(false);
+        } else {
+          await sound.playAsync();
+          setIsPlaying(true);
+        }
+        return;
       }
 
-      return;
+      // New song — unload old, play new
+      if (sound) {
+        await sound.unloadAsync();
+      }
+
+      const audioUrl =
+        songToPlay.downloadUrl?.[4]?.url ||
+        songToPlay.downloadUrl?.[0]?.url;
+
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: true }
+      );
+
+      setSound(newSound);
+      setCurrentSong(songToPlay);
+      addRecentlyPlayed(songToPlay);
+      setIsPlaying(true);
+    } catch (error) {
+      console.log('PLAY ERROR:', error);
+    }
+  };
+
+  // 👇 Next song — queue store se
+  const playNextSong = async () => {
+    if (!queue?.length) return;
+
+    let nextSong;
+
+    if (shuffle) {
+      const randomIndex = Math.floor(Math.random() * queue.length);
+      nextSong = queue[randomIndex];
+    } else {
+      const currentIndex = queue.findIndex(
+        (s: any) => s.id === (currentSong?.id ?? song.id)
+      );
+      nextSong = queue[(currentIndex + 1) % queue.length];
     }
 
-    // Agar koi aur song pehle se loaded hai
-    if (sound) {
-      await sound.unloadAsync();
-    }
+    await playSong(nextSong);
+  };
 
-    const audioUrl =
-      song.downloadUrl?.[4]?.url ||
-      song.downloadUrl?.[0]?.url;
-console.log("PLAYING URL:", audioUrl);
-    const { sound: newSound } =
-      await Audio.Sound.createAsync({
-        uri: audioUrl,
-      });
+  // 👇 Prev song — queue store se
+  const playPrevSong = async () => {
+    if (!queue?.length) return;
 
-    await newSound.playAsync();
-    console.log("NEW SONG STARTED:", song.name);
+    const currentIndex = queue.findIndex(
+      (s: any) => s.id === (currentSong?.id ?? song.id)
+    );
 
-    setSound(newSound);
-    setCurrentSong(song);
-    addRecentlyPlayed(song);
-    setIsPlaying(true);
-    console.log("recently played",recentlyPlayed);
+    const prevIndex =
+      currentIndex <= 0 ? queue.length - 1 : currentIndex - 1;
 
-  } catch (error) {
-    console.log('PLAY ERROR:', error);
-  }
-};
-  
+    await playSong(queue[prevIndex]);
+  };
+
+  // 👇 Pehli baar screen open ho toh song auto-play
+  useEffect(() => {
+    playSong(song);
+  }, []);
 
   return (
-    <SafeAreaView style={{flex:1}}>
-    <View style={styles.container}>
-      <View style={styles.header}>
-    <TouchableOpacity onPress ={() => navigation.goBack()}>
-    <Ionicons
-    name="arrow-back"
-    size={22}
-    color="black"
-    />
-   </TouchableOpacity>
+    <SafeAreaView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color="black" />
+          </TouchableOpacity>
+          <TouchableOpacity>
+            <Ionicons name="ellipsis-horizontal-circle-outline" size={28} color="black" />
+          </TouchableOpacity>
+        </View>
 
-  <TouchableOpacity>
-    <Ionicons
-    name="ellipsis-horizontal-circle-outline"
-    size={28}
-    color="black"
-    />
-  </TouchableOpacity>
-</View>
-      <Image
-        source={{
-          uri: song.image?.[2]?.url || song.image?.[2]?.link,
-        }}
-        style={styles.image}
-      />
+        {/* Album Art */}
+        <Image
+          source={{
+            uri:
+              displaySong.image?.[2]?.url ||
+              displaySong.image?.[2]?.link,
+          }}
+          style={styles.image}
+        />
 
-      <Text style={styles.title}
-      numberOfLines={1}>
-        {decodeHtml(song.name)}
-      </Text>
+        {/* Song Info */}
+        <Text style={styles.title} numberOfLines={1}>
+          {decodeHtml(displaySong.name)}
+        </Text>
+        <Text style={styles.artist} numberOfLines={1}>
+          {displaySong.primaryArtists}
+        </Text>
 
-      <Text style={styles.artist}
-      numberOfLines={1}>
-        {song.primaryArtists}
-      </Text>
+        <View style={styles.divider} />
 
-      <View style={styles.divider} />
+        {/* Progress Bar (static for now) */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressTrack}>
+            <View style={styles.progressFill} />
+            <View style={styles.progressThumb} />
+          </View>
+          <View style={styles.timeRow}>
+            <Text>00:35</Text>
+            <Text>03:50</Text>
+          </View>
+        </View>
 
-      <View style={styles.progressContainer}>
-  <View style={styles.progressTrack}>
-    <View style={styles.progressFill} />
-    <View style={styles.progressThumb} />
-  </View>
+        {/* Controls */}
+        <View style={styles.controls}>
+          {/* 👇 Prev button — ab kaam karega */}
+          <TouchableOpacity onPress={playPrevSong}>
+            <Ionicons name="play-skip-back" size={25} color="black" />
+          </TouchableOpacity>
 
-  <View style={styles.timeRow}>
-    <Text >00:35</Text>
-    <Text>03:50</Text>
-  </View>
-</View>
+          <MaterialIcons name="replay-10" size={27} color="black" />
 
-<View style={styles.controls}>
-  <Ionicons
-    name="play-skip-back"
-    size={25}
-    color="black"
-  />
+          <Pressable
+            style={styles.playButton}
+            onPress={() => playSong(displaySong)}
+          >
+            <Ionicons
+              name={
+                currentSong?.id === displaySong.id && isPlaying
+                  ? 'pause'
+                  : 'play'
+              }
+              size={30}
+              color="white"
+              style={{ marginLeft: 4 }}
+            />
+          </Pressable>
 
-  <MaterialIcons
-    name="replay-10"
-    size={27}
-    color="black"
-  />
+          <MaterialIcons name="forward-10" size={27} color="black" />
 
-  <Pressable 
-  style={styles.playButton}
-  onPress={playSong}
-  >
-    <Ionicons
-      name={currentSong?.id === song.id && isPlaying? 'pause':'play'}
-      size={30}
-      color="white"
-      style={{marginLeft: 4}}
-    />
-  </Pressable>
+          {/* 👇 Next button — ab kaam karega */}
+          <TouchableOpacity onPress={playNextSong}>
+            <Ionicons name="play-skip-forward" size={25} color="black" />
+          </TouchableOpacity>
+        </View>
 
-  <MaterialIcons
-    name="forward-10"
-    size={27}
-    color="black"
-  />
+        {/* Bottom Actions */}
+        <View style={styles.bottomActions}>
+          <TouchableOpacity onPress={() => setShuffle(!shuffle)}>
+            <Ionicons
+              name="shuffle"
+              size={24}
+              color={shuffle ? '#ff8c1a' : 'black'}
+            />
+          </TouchableOpacity>
 
-  <Ionicons
-    name="play-skip-forward"
-    size={25}
-    color="black"
-  />
-</View>
-<View style={styles.bottomActions}>
-  <MaterialCommunityIcons
-    name="speedometer"
-    size={24}
-    color="black"
-  />
+          <MaterialCommunityIcons name="speedometer" size={24} color="black" />
+          <MaterialCommunityIcons name="timer-outline" size={24} color="black" />
 
-  <MaterialCommunityIcons
-    name="timer-outline"
-    size={24}
-    color="black"
-  />
+          <TouchableOpacity onPress={() => setRepeat(!repeat)}>
+            <Ionicons
+              name="repeat"
+              size={24}
+              color={repeat ? '#ff8c1a' : 'black'}
+            />
+          </TouchableOpacity>
 
-  <MaterialCommunityIcons
-    name="cast"
-    size={24}
-    color="black"
-  />
+          <MaterialCommunityIcons name="cast" size={24} color="black" />
+          <Ionicons name="ellipsis-vertical" size={24} color="black" />
+        </View>
 
-  <Ionicons
-    name="ellipsis-vertical"
-    size={24}
-    color="black"
-  />
-</View>
-
-<View style={styles.lyricsContainer}>
-  <Ionicons
-    name="chevron-up"
-    size={24}
-    color="black"
-  />
-
-  <Text style={styles.lyricsText}>
-    Lyrics
-  </Text>
-</View>
-    </View>
+        {/* Lyrics */}
+        <View style={styles.lyricsContainer}>
+          <Ionicons name="chevron-up" size={24} color="black" />
+          <Text style={styles.lyricsText}>Lyrics</Text>
+        </View>
+      </View>
     </SafeAreaView>
   );
 };
@@ -234,110 +227,92 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
   },
-
   image: {
     width: 320,
     height: 320,
     borderRadius: 30,
-    alignSelf:'center',
+    alignSelf: 'center',
   },
-
   title: {
     fontSize: 28,
     fontWeight: '700',
     marginTop: 20,
-    textAlign:'center',
+    textAlign: 'center',
   },
-
   artist: {
     fontSize: 16,
     color: 'gray',
     marginTop: 0,
-    textAlign:'center',
-    paddingHorizontal:20,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
-  header:{
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 27,
-  marginTop:10
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 27,
+    marginTop: 10,
   },
-  progressContainer: {
-  marginTop: 30,
-},
-
-progressTrack: {
-  height: 4,
-  backgroundColor: '#ddd',
-  borderRadius: 10,
-  position: 'relative',
-},
-
-progressFill: {
-  width: '70%',
-  height: 4,
-  backgroundColor: '#ff8c1a',
-  borderRadius: 10,
-},
-
-progressThumb: {
-  width: 14,
-  height: 14,
-  borderRadius: 7,
-  backgroundColor: '#ff8c1a',
-  position: 'absolute',
-  right: '28%',
-  top: -5,
-},
-
-timeRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  marginTop: 10,
-},
-
-controls: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginTop: 10,
-  marginLeft:10,
-},
-
-playButton: {
-  width: 60,
-  height: 60,
-  borderRadius: 35,
-  backgroundColor: '#ff8c1a',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-
-bottomActions: {
-  flexDirection: 'row',
-  justifyContent: 'space-around',
-  alignItems: 'center',
-  marginTop: 20,
-},
-
-lyricsContainer: {
-  alignItems: 'center',
-  marginTop: 30,
-  marginBottom:20
-  
-},
-
-lyricsText: {
-  fontSize: 17,
-  fontWeight: '700',
-  marginTop: 4,
-},
-
-divider: {
-  height: 1,
-  backgroundColor: '#EAEAEA',
-  marginTop: 0,
-  marginBottom: 0,
-},
+  progressContainer: { marginTop: 30 },
+  progressTrack: {
+    height: 4,
+    backgroundColor: '#ddd',
+    borderRadius: 10,
+    position: 'relative',
+  },
+  progressFill: {
+    width: '70%',
+    height: 4,
+    backgroundColor: '#ff8c1a',
+    borderRadius: 10,
+  },
+  progressThumb: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#ff8c1a',
+    position: 'absolute',
+    right: '28%',
+    top: -5,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    marginLeft: 10,
+  },
+  playButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 35,
+    backgroundColor: '#ff8c1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bottomActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  lyricsContainer: {
+    alignItems: 'center',
+    marginTop: 30,
+    marginBottom: 20,
+  },
+  lyricsText: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#EAEAEA',
+  },
 });

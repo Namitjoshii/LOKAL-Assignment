@@ -5,14 +5,19 @@ interface PlayerStore {
   currentSong: any;
   isPlaying: boolean;
   sound: Audio.Sound | null;
-
   recentlyPlayed: any[];
+  shuffle: boolean;
+  repeat: boolean;
+  queue: any[];
 
   setCurrentSong: (song: any) => void;
   setIsPlaying: (playing: boolean) => void;
   setSound: (sound: Audio.Sound | null) => void;
-
   addRecentlyPlayed: (song: any) => void;
+  setShuffle: (value: boolean) => void;
+  setRepeat: (value: boolean) => void;
+  setQueue:(songs: any[]) => void;
+  
 }
 
 export const usePlayerStore =
@@ -20,8 +25,22 @@ export const usePlayerStore =
     currentSong: null,
     isPlaying: false,
     sound: null,
-
     recentlyPlayed: [],
+    shuffle: false,
+    repeat: false,
+    queue: [],
+
+    setQueue:(songs) => set({queue:songs}),
+    
+    setShuffle: (value) =>
+      set({
+        shuffle: value,
+      }),
+
+    setRepeat: (value) =>
+      set({
+        repeat: value,
+      }),
 
     setCurrentSong: (song) =>
       set({
