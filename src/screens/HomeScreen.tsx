@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import SongCard from '../components/SongCard';
 import { searchSongs } from '../services/songService';
 import { usePlayerStore } from '../store/playerStore';
-
+import MiniPlayer from '../components/MiniPlayer';
 const HomeScreen = () => {
   const navigation = useNavigation<any>();
 
@@ -53,6 +53,7 @@ const HomeScreen = () => {
           />
         )}
       />
+      <MiniPlayer/>
     </SafeAreaView>
   );
 };
