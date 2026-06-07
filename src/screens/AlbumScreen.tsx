@@ -7,52 +7,39 @@ import {
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { getArtistSongs } from '../services/artistService';
+import { getAlbumById } from '../services/albumService';
 import { decodeHtml } from '../utils/decodeHtml';
 import { usePlayerStore } from '../store/playerStore';
 
 const { width } = Dimensions.get('window');
 
-const ArtistDetailScreen = () => {
+const AlbumScreen = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  const { artistId, artistName, artistImage } = route.params;
+  const { albumId, albumName, albumImage, albumYear, albumArtist } = route.params;
 
   const [songs, setSongs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const { setQueue, setCurrentSong, setIsPlaying, setSound, addRecentlyPlayed } =
-    usePlayerStore();
+  const { setQueue } = usePlayerStore();
 
   useEffect(() => {
     const load = async () => {
       try {
-        const songsRes = await getArtistSongs(artistId);
-        const songList =
-          songsRes.data?.songs ||
-          songsRes.data?.topSongs ||
-          songsRes.data?.results ||
-          [];
+        const res = await getAlbumById(albumId);
+        const songList = res.data?.songs ?? [];
         setSongs(songList);
         setQueue(songList);
-      } catch (error) {
-        console.log(error);
+      } catch (e) {
+        console.log(e);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [artistId]);
+  }, [albumId]);
 
-  // Total duration
-  const totalSecs = songs.reduce(
-    (acc, s) => acc + (parseInt(s.duration) || 0), 0
-  );
-  const hrs = Math.floor(totalSecs / 3600);
-  const mins = Math.floor((totalSecs % 3600) / 60);
-  const durationLabel = hrs > 0
-    ? `${hrs}:${String(mins).padStart(2, '0')} hrs`
-    : `${mins} mins`;
+  const totalSecs = songs.reduce((acc, s) => acc + (parseInt(s.duration) || 0), 0);
+  const mins = Math.floor(totalSecs / 60);
 
   if (loading) {
     return (
@@ -65,38 +52,30 @@ const ArtistDetailScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color="#222" />
           </TouchableOpacity>
-          <View style={styles.topBarRight}>
-            <TouchableOpacity style={{ marginRight: 16 }}>
-              <Ionicons name="search-outline" size={24} color="#222" />
-            </TouchableOpacity>
-            <TouchableOpacity>
-              <Ionicons name="ellipsis-horizontal-circle-outline" size={26} color="#222" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity>
+            <Ionicons name="ellipsis-horizontal-circle-outline" size={26} color="#222" />
+          </TouchableOpacity>
         </View>
 
-        {/* Artist Image — square with rounded corners like image */}
-        <Image
-          source={{ uri: artistImage }}
-          style={styles.artistImage}
-        />
+        {/* Album Art */}
+        <Image source={{ uri: albumImage }} style={styles.albumImage} />
 
-        {/* Artist Info */}
+        {/* Info */}
         <View style={styles.infoBlock}>
-          <Text style={styles.artistName}>{artistName}</Text>
-          <Text style={styles.artistMeta}>
-            1 Album  |  {songs.length} Songs
-            {totalSecs > 0 ? `  |  ${durationLabel}` : ''}
+          <Text style={styles.albumName}>{decodeHtml(albumName ?? '')}</Text>
+          <Text style={styles.albumMeta}>
+            {albumArtist}
+            {albumYear ? `  |  ${albumYear}` : ''}
+            {mins > 0 ? `  |  ${mins} mins` : ''}
           </Text>
         </View>
 
-        {/* Shuffle + Play buttons */}
+        {/* Shuffle + Play */}
         <View style={styles.actionRow}>
           <TouchableOpacity
             style={styles.shuffleBtn}
@@ -124,27 +103,22 @@ const ArtistDetailScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Songs Section */}
+        {/* Songs */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Songs</Text>
-          <TouchableOpacity>
-            <Text style={styles.seeAll}>See All</Text>
-          </TouchableOpacity>
+          <Text style={styles.songCount}>{songs.length} songs</Text>
         </View>
 
-        {songs.slice(0, 10).map((item, index) => (
+        {songs.map((item, index) => (
           <TouchableOpacity
             key={item.id ?? index}
             style={styles.songRow}
-            onPress={() =>
-              navigation.navigate('Player', { song: item, songs })
-            }
+            onPress={() => navigation.navigate('Player', { song: item, songs })}
             activeOpacity={0.75}
           >
+            <Text style={styles.songIndex}>{index + 1}</Text>
             <Image
-              source={{
-                uri: item.image?.[2]?.url ?? item.image?.[1]?.url ?? item.image?.[2]?.link,
-              }}
+              source={{ uri: item.image?.[2]?.url ?? item.image?.[1]?.url }}
               style={styles.songThumb}
             />
             <View style={styles.songInfo}>
@@ -155,18 +129,12 @@ const ArtistDetailScreen = () => {
                 {item.primaryArtists ?? item.artists?.primary?.[0]?.name}
               </Text>
             </View>
-
-            {/* Play button */}
             <TouchableOpacity
               style={styles.songPlayBtn}
-              onPress={() =>
-                navigation.navigate('Player', { song: item, songs })
-              }
+              onPress={() => navigation.navigate('Player', { song: item, songs })}
             >
               <Ionicons name="play" size={14} color="white" />
             </TouchableOpacity>
-
-            {/* 3 dot */}
             <TouchableOpacity style={{ padding: 6 }}>
               <Ionicons name="ellipsis-vertical" size={18} color="#666" />
             </TouchableOpacity>
@@ -179,13 +147,11 @@ const ArtistDetailScreen = () => {
   );
 };
 
-export default ArtistDetailScreen;
+export default AlbumScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-
   loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -193,35 +159,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  topBarRight: { flexDirection: 'row', alignItems: 'center' },
-
-  // Square image with rounded corners — exactly like design
-  artistImage: {
+  albumImage: {
     width: width - 80,
     height: width - 80,
     borderRadius: 20,
     alignSelf: 'center',
     marginTop: 8,
   },
-
-  infoBlock: {
-    alignItems: 'center',
-    marginTop: 20,
-    paddingHorizontal: 20,
-  },
-  artistName: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#111',
-    textAlign: 'center',
-  },
-  artistMeta: {
-    fontSize: 13,
-    color: '#888',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-
+  infoBlock: { alignItems: 'center', marginTop: 20, paddingHorizontal: 20 },
+  albumName: { fontSize: 24, fontWeight: '800', color: '#111', textAlign: 'center' },
+  albumMeta: { fontSize: 13, color: '#888', marginTop: 6, textAlign: 'center' },
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -230,60 +177,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   shuffleBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 30,
-    borderWidth: 1.5,
-    borderColor: '#ff8c1a',
+    flex: 1, flexDirection: 'row', justifyContent: 'center',
+    alignItems: 'center', gap: 8, paddingVertical: 13,
+    borderRadius: 30, borderWidth: 1.5, borderColor: '#ff8c1a',
   },
   shuffleText: { color: '#ff8c1a', fontWeight: '700', fontSize: 15 },
-
   playBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 30,
-    borderWidth: 1.5,
-    borderColor: '#ff8c1a',
+    flex: 1, flexDirection: 'row', justifyContent: 'center',
+    alignItems: 'center', gap: 8, paddingVertical: 13,
+    borderRadius: 30, borderWidth: 1.5, borderColor: '#ff8c1a',
   },
   playText: { color: '#ff8c1a', fontWeight: '700', fontSize: 15 },
-
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginTop: 28,
-    marginBottom: 8,
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', paddingHorizontal: 16, marginTop: 28, marginBottom: 8,
   },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111' },
-  seeAll: { fontSize: 13, color: '#ff8c1a', fontWeight: '600' },
-
+  songCount: { fontSize: 13, color: '#888' },
   songRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 10,
   },
-  songThumb: { width: 50, height: 50, borderRadius: 10 },
+  songIndex: { fontSize: 13, color: '#bbb', width: 24, textAlign: 'center' },
+  songThumb: { width: 46, height: 46, borderRadius: 8 },
   songInfo: { flex: 1, marginLeft: 12 },
   songName: { fontSize: 14, fontWeight: '600', color: '#111' },
   songArtist: { fontSize: 12, color: '#888', marginTop: 3 },
-
   songPlayBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#ff8c1a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 4,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#ff8c1a', justifyContent: 'center',
+    alignItems: 'center', marginRight: 4,
   },
 });

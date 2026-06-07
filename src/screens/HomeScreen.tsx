@@ -20,6 +20,9 @@ import { usePlayerStore } from '../store/playerStore';
 import SuggestedContent from '../components/SuggestedContent';
 import { decodeHtml } from '../utils/decodeHtml';
 import ArtistsContent from '../components/ArtistsContent';
+import { searchAlbums } from '../services/albumService';
+import { getAlbumById } from '../services/albumService';
+import AlbumsContent from '../components/AlbumsContent';
 
 // Menu items config — easy to add/remove
 const MENU_ITEMS = [
@@ -86,6 +89,8 @@ const MENU_ITEMS = [
   },
 ];
 
+
+
 const HomeScreen = () => {
   const navigation = useNavigation<any>();
   const [songs, setSongs] = useState<any[]>([]);
@@ -101,6 +106,13 @@ const HomeScreen = () => {
   const loadSongs = async () => {
     try {
       setLoading(true);
+
+const albums = await searchAlbums('arijit');
+    console.log(
+      'ALBUM:',
+      JSON.stringify(albums.data.results[0], null, 2)
+    );
+    
       const data = await searchSongs('arijit');
       setSongs(data.data.results);
     } catch (error) {
@@ -127,6 +139,8 @@ const HomeScreen = () => {
       return next;
     });
   };
+  
+  
 
   const handleMenuAction = async (
   actionId: string
@@ -236,10 +250,7 @@ const HomeScreen = () => {
       
 
       {activeTab === 'albums' && (
-        <View style={styles.center}>
-          <Ionicons name="albums-outline" size={60} color="#ff8c1a" />
-          <Text style={styles.comingText}>Albums Coming Soon</Text>
-        </View>
+        <AlbumsContent/>
       )}
 
       <MiniPlayer />

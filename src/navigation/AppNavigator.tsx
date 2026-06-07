@@ -6,6 +6,7 @@ import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import PlayerScreen from '../screens/PlayerScreen';
 import ArtistDetailScreen from '../screens/ArtistScreen';
+import AlbumScreen from '../screens/AlbumScreen';
 
 // Placeholder screens
 import { View, Text } from 'react-native';
@@ -42,6 +43,7 @@ function HomeStack() {
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="Player" component={PlayerScreen} />
       <Stack.Screen name="Artist" component={ArtistDetailScreen} />
+      <Stack.Screen name="Album" component={AlbumScreen} />
     </Stack.Navigator>
   );
 }

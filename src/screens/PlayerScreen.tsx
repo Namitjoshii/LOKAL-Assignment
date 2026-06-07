@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, Image, StyleSheet,
   TouchableOpacity, Pressable,
@@ -8,9 +8,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-
 import { decodeHtml } from '../utils/decodeHtml';
 import { usePlayerStore } from '../store/playerStore';
+import { PanResponder } from 'react-native'; 
 
 const PlayerScreen = () => {
   const route = useRoute<any>();
@@ -22,18 +22,33 @@ const PlayerScreen = () => {
     sound, setSound,
     shuffle, repeat, setShuffle, setRepeat,
     addRecentlyPlayed,
-    queue,  // 👈 store se queue
+    queue,
   } = usePlayerStore();
 
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [trackWidth, setTrackWidth] = useState(1);
   const { song } = route.params;
-
-  // 👇 FIX: displaySong — agar currentSong hai toh woh, warna route ka song
   const displaySong = currentSong ?? song;
+
+  const formatTime = (millis: number) => {
+    const totalSeconds = Math.floor(millis / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   const playSong = async (songToPlay: any) => {
     try {
-      // Same song — toggle play/pause
+
+
+
+      // ✅ Same song — toggle play/pause
       if (sound && currentSong?.id === songToPlay.id) {
+        const status = await sound.getStatusAsync();
+        if (!status.isLoaded) return;
+
         if (isPlaying) {
           await sound.pauseAsync();
           setIsPlaying(false);
@@ -44,66 +59,102 @@ const PlayerScreen = () => {
         return;
       }
 
-      // New song — unload old, play new
+      // ✅ Naya song — pehle wala unload karo
       if (sound) {
-        await sound.unloadAsync();
+        try { await sound.unloadAsync(); } catch (e) {}
+        setSound(null);
       }
 
       const audioUrl =
         songToPlay.downloadUrl?.[4]?.url ||
         songToPlay.downloadUrl?.[0]?.url;
 
+      if (!audioUrl) {
+        console.log('NO URL for:', songToPlay.name);
+        return;
+      }
+
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
-        { shouldPlay: true }
+        { shouldPlay: true, progressUpdateIntervalMillis: 500 }
       );
+
+      newSound.setOnPlaybackStatusUpdate((status: any) => {
+        if (!status.isLoaded) return;
+        if (!isSeeking) {
+          setPosition(status.positionMillis || 0);
+        }
+        setDuration(status.durationMillis || 0);
+
+        if (status.didJustFinish) {
+          if (repeat) {
+            newSound.replayAsync();
+          } else {
+            playNextSong();
+          }
+        }
+      });
 
       setSound(newSound);
       setCurrentSong(songToPlay);
       addRecentlyPlayed(songToPlay);
       setIsPlaying(true);
+
     } catch (error) {
       console.log('PLAY ERROR:', error);
     }
   };
 
-  // 👇 Next song — queue store se
   const playNextSong = async () => {
     if (!queue?.length) return;
-
     let nextSong;
-
     if (shuffle) {
-      const randomIndex = Math.floor(Math.random() * queue.length);
-      nextSong = queue[randomIndex];
+      nextSong = queue[Math.floor(Math.random() * queue.length)];
     } else {
       const currentIndex = queue.findIndex(
         (s: any) => s.id === (currentSong?.id ?? song.id)
       );
       nextSong = queue[(currentIndex + 1) % queue.length];
     }
-
     await playSong(nextSong);
   };
 
-  // 👇 Prev song — queue store se
   const playPrevSong = async () => {
     if (!queue?.length) return;
-
     const currentIndex = queue.findIndex(
       (s: any) => s.id === (currentSong?.id ?? song.id)
     );
-
-    const prevIndex =
-      currentIndex <= 0 ? queue.length - 1 : currentIndex - 1;
-
+    const prevIndex = currentIndex <= 0 ? queue.length - 1 : currentIndex - 1;
     await playSong(queue[prevIndex]);
   };
 
-  // 👇 Pehli baar screen open ho toh song auto-play
+  // ✅ Fix — har baar screen open ho, song se compare karke play karo
   useEffect(() => {
     playSong(song);
-  }, []);
+  }, [song.id]); // song.id change hone pe hi re-trigger hoga
+
+  // Sync position jab sound already chal raha ho (screen se wapas aao)
+  useEffect(() => {
+    if (!sound) return;
+    sound.setOnPlaybackStatusUpdate((status: any) => {
+      if (!status.isLoaded) return;
+      if (!isSeeking) {
+        setPosition(status.positionMillis || 0);
+      }
+      setDuration(status.durationMillis || 0);
+    });
+  }, [sound]);
+
+  const handleSeek = async (value: number) => {
+    if (!sound) return;
+    try {
+      await sound.setPositionAsync(value);
+      setPosition(value);
+    } catch (err) {
+      console.log('SEEK ERROR:', err);
+    }
+    setIsSeeking(false);
+  };
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -121,9 +172,7 @@ const PlayerScreen = () => {
         {/* Album Art */}
         <Image
           source={{
-            uri:
-              displaySong.image?.[2]?.url ||
-              displaySong.image?.[2]?.link,
+            uri: displaySong.image?.[2]?.url || displaySong.image?.[2]?.link,
           }}
           style={styles.image}
         />
@@ -138,46 +187,95 @@ const PlayerScreen = () => {
 
         <View style={styles.divider} />
 
-        {/* Progress Bar (static for now) */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressTrack}>
-            <View style={styles.progressFill} />
-            <View style={styles.progressThumb} />
-          </View>
-          <View style={styles.timeRow}>
-            <Text>00:35</Text>
-            <Text>03:50</Text>
-          </View>
-        </View>
+        {/* Progress Bar — custom, no external slider lib */}
+          
+<View style={styles.progressContainer}>
+  <View
+    style={styles.progressTrackWrapper}
+    onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+    onStartShouldSetResponder={() => true}
+    onResponderGrant={(e) => {
+      setIsSeeking(true);
+      const x = Math.min(Math.max(e.nativeEvent.locationX, 0), trackWidth);
+      setPosition((x / trackWidth) * duration);
+    }}
+    onResponderMove={(e) => {
+      const x = Math.min(Math.max(e.nativeEvent.locationX, 0), trackWidth);
+      setPosition((x / trackWidth) * duration);
+    }}
+    onResponderRelease={(e) => {
+      const x = Math.min(Math.max(e.nativeEvent.locationX, 0), trackWidth);
+      handleSeek((x / trackWidth) * duration);
+    }}
+  >
+    {/* Track background */}
+    <View style={styles.progressTrack}>
+      {/* Filled portion */}
+      <View
+        style={[
+          styles.progressFill,
+          { width: duration > 0 ? `${(position / duration) * 100}%` : '0%' },
+        ]}
+      />
+    </View>
+    {/* Thumb */}
+    <View
+      style={[
+        styles.progressThumb,
+        {
+          left: duration > 0
+            ? (position / duration) * trackWidth - 8
+            : -8,
+        },
+      ]}
+    />
+  </View>
 
+  <View style={styles.timeRow}>
+    <Text style={styles.timeText}>{formatTime(position)}</Text>
+    <Text style={styles.timeText}>{formatTime(duration)}</Text>
+  </View>
+</View>
         {/* Controls */}
         <View style={styles.controls}>
-          {/* 👇 Prev button — ab kaam karega */}
           <TouchableOpacity onPress={playPrevSong}>
             <Ionicons name="play-skip-back" size={25} color="black" />
           </TouchableOpacity>
 
-          <MaterialIcons name="replay-10" size={27} color="black" />
+          <TouchableOpacity onPress={async () => {
+            if (!sound) return;
+            const status = await sound.getStatusAsync();
+            if (!status.isLoaded) return;
+            const newPos = Math.max(0, position - 10000);
+            await sound.setPositionAsync(newPos);
+            setPosition(newPos);
+          }}>
+            <MaterialIcons name="replay-10" size={27} color="black" />
+          </TouchableOpacity>
 
           <Pressable
             style={styles.playButton}
             onPress={() => playSong(displaySong)}
           >
             <Ionicons
-              name={
-                currentSong?.id === displaySong.id && isPlaying
-                  ? 'pause'
-                  : 'play'
-              }
+              name={currentSong?.id === displaySong.id && isPlaying ? 'pause' : 'play'}
               size={30}
               color="white"
               style={{ marginLeft: 4 }}
             />
           </Pressable>
 
-          <MaterialIcons name="forward-10" size={27} color="black" />
+          <TouchableOpacity onPress={async () => {
+            if (!sound) return;
+            const status = await sound.getStatusAsync();
+            if (!status.isLoaded) return;
+            const newPos = Math.min(duration, position + 10000);
+            await sound.setPositionAsync(newPos);
+            setPosition(newPos);
+          }}>
+            <MaterialIcons name="forward-10" size={27} color="black" />
+          </TouchableOpacity>
 
-          {/* 👇 Next button — ab kaam karega */}
           <TouchableOpacity onPress={playNextSong}>
             <Ionicons name="play-skip-forward" size={25} color="black" />
           </TouchableOpacity>
@@ -186,22 +284,14 @@ const PlayerScreen = () => {
         {/* Bottom Actions */}
         <View style={styles.bottomActions}>
           <TouchableOpacity onPress={() => setShuffle(!shuffle)}>
-            <Ionicons
-              name="shuffle"
-              size={24}
-              color={shuffle ? '#ff8c1a' : 'black'}
-            />
+            <Ionicons name="shuffle" size={24} color={shuffle ? '#ff8c1a' : 'black'} />
           </TouchableOpacity>
 
           <MaterialCommunityIcons name="speedometer" size={24} color="black" />
           <MaterialCommunityIcons name="timer-outline" size={24} color="black" />
 
           <TouchableOpacity onPress={() => setRepeat(!repeat)}>
-            <Ionicons
-              name="repeat"
-              size={24}
-              color={repeat ? '#ff8c1a' : 'black'}
-            />
+            <Ionicons name="repeat" size={24} color={repeat ? '#ff8c1a' : 'black'} />
           </TouchableOpacity>
 
           <MaterialCommunityIcons name="cast" size={24} color="black" />
@@ -251,41 +341,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 27,
-    marginTop: 10,
+    marginTop: 5,
   },
-  progressContainer: { marginTop: 30 },
+  progressTrackWrapper: {
+  height: 20,          // bada touch area
+  justifyContent: 'center',
+  position: 'relative',
+},
+  progressContainer: { marginTop: 30,paddingHorizontal:4, },
   progressTrack: {
     height: 4,
-    backgroundColor: '#ddd',
-    borderRadius: 10,
-    position: 'relative',
+  backgroundColor: '#E8E8E8',
+  borderRadius: 4,
+  overflow: 'hidden',
   },
   progressFill: {
-    width: '70%',
     height: 4,
     backgroundColor: '#ff8c1a',
-    borderRadius: 10,
-  },
-  progressThumb: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#ff8c1a',
-    position: 'absolute',
-    right: '28%',
-    top: -5,
+    borderRadius: 4,
+    
   },
   timeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10,
+    marginTop: 6,
+  },
+  timeText: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight:'500',
   },
   controls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
-    marginLeft: 10,
+    marginTop: 20,
   },
   playButton: {
     width: 60,
@@ -314,5 +404,22 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: '#EAEAEA',
+    marginVertical: 8,
   },
+
+progressThumb: {
+   width: 16,
+  height: 16,
+  borderRadius: 8,
+  backgroundColor: '#ff8c1a',
+  position: 'absolute',
+  top: 1,             // (36 - 16) / 2 = center vertically
+  shadowColor: '#ff8c1a',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.4,
+  shadowRadius: 4,
+  elevation: 4,
+},
+
+
 });
