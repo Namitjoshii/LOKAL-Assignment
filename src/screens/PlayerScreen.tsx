@@ -83,21 +83,24 @@ const PlayerScreen = () => {
         { shouldPlay: true, progressUpdateIntervalMillis: 500 }
       );
 
-      newSound.setOnPlaybackStatusUpdate((status: any) => {
-        if (!status.isLoaded) return;
-        if (!isSeeking) {
-          setPosition(status.positionMillis || 0);
-        }
-        setDuration(status.durationMillis || 0);
+     newSound.setOnPlaybackStatusUpdate(async (status: any) => {
+  if (!status.isLoaded) return;
 
-        if (status.didJustFinish) {
-          if (repeat) {
-            newSound.replayAsync();
-          } else {
-            playNextSong();
-          }
-        }
-      });
+  if (!isSeeking) {
+    setPosition(status.positionMillis || 0);
+  }
+
+  setDuration(status.durationMillis || 0);
+
+  if (status.didJustFinish) {
+    if (usePlayerStore.getState().repeat) {
+      await newSound.setPositionAsync(0);
+      await newSound.playAsync();
+    } else {
+      await playNextSong();
+    }
+  }
+});
 
       setSound(newSound);
       setCurrentSong(songToPlay);
@@ -138,7 +141,7 @@ const PlayerScreen = () => {
   }, [song.id]); // song.id change hone pe hi re-trigger hoga
 
   // Sync position jab sound already chal raha ho (screen se wapas aao)
-  useEffect(() => {
+  /*useEffect(() => {
     if (!sound) return;
     sound.setOnPlaybackStatusUpdate((status: any) => {
       if (!status.isLoaded) return;
@@ -147,7 +150,7 @@ const PlayerScreen = () => {
       }
       setDuration(status.durationMillis || 0);
     });
-  }, [sound]);
+  }, [sound]);*/
 
   const handleSeek = async (value: number) => {
     if (!sound) return;

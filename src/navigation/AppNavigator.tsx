@@ -2,6 +2,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import FavouritesScreen from '../screens/FavouritesScreen';
+import PlaylistsScreen from '../screens/PlaylistsScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import PlayerScreen from '../screens/PlayerScreen';
@@ -9,28 +12,7 @@ import ArtistDetailScreen from '../screens/ArtistScreen';
 import AlbumScreen from '../screens/AlbumScreen';
 
 // Placeholder screens
-import { View, Text } from 'react-native';
-const FavouritesScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text style={{ fontSize: 18, fontWeight: '600', color: '#888' }}>
-      Favourites Coming Soon
-    </Text>
-  </View>
-);
-const PlaylistsScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text style={{ fontSize: 18, fontWeight: '600', color: '#888' }}>
-      Playlists Coming Soon
-    </Text>
-  </View>
-);
-const SettingsScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text style={{ fontSize: 18, fontWeight: '600', color: '#888' }}>
-      Settings Coming Soon
-    </Text>
-  </View>
-);
+
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
