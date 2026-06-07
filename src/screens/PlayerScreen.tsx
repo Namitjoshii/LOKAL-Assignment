@@ -41,9 +41,6 @@ const PlayerScreen = () => {
 
   const playSong = async (songToPlay: any) => {
     try {
-
-
-
       // ✅ Same song — toggle play/pause
       if (sound && currentSong?.id === songToPlay.id) {
         const status = await sound.getStatusAsync();
@@ -64,6 +61,13 @@ const PlayerScreen = () => {
         try { await sound.unloadAsync(); } catch (e) {}
         setSound(null);
       }
+
+       await Audio.setAudioModeAsync({
+      staysActiveInBackground: true,
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: false,
+    });
+
 
       const audioUrl =
         songToPlay.downloadUrl?.[4]?.url ||

@@ -26,6 +26,7 @@ const AlbumScreen = () => {
     const load = async () => {
       try {
         const res = await getAlbumById(albumId);
+        console.log('ALBUM DETAIL:', JSON.stringify(res, null, 2));
         const songList = res.data?.songs ?? [];
         setSongs(songList);
         setQueue(songList);

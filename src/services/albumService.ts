@@ -6,6 +6,6 @@ export const searchAlbums = async (query: string) => {
 };
 
 export const getAlbumById = async (id: string) => {
-  const response = await api.get(`/albums/${id}`);
+  const response = await api.get(`/albums?id=${id}`);  
   return response.data;
 };
